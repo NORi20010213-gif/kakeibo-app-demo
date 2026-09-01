@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="家計簿">
+<title>家計簿</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --ink: #111111;
+    --paper: #fafafa;
+    --card: #ffffff;
+    --line: #f0f0f0;
+    --muted: #aaaaaa;
+    --accent: #E8711A;
+    --accent-bg: #FFF4EE;
+    --danger: #D32F2F;
+    --danger-bg: #FFF0F0;
+    --radius: 14px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--card);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    color: var(--ink);
+    overscroll-behavior: none;
+    height: 100%;
+    width: 100%;
+  }
+
+  @media (min-width: 481px) {
+    body {
+      background: var(--ink);
+    }
+  }
+
+  #app {
+    position: fixed;
+    inset: 0;
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #app::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--paper);
+    z-index: -1;
+  }
+
+  .status-spacer {
+    height: env(safe-area-inset-top);
+    background: var(--card);
+  }
+
+  header.app-header {
+    padding: 14px 20px 16px;
+    border-bottom: 0.5px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  header.app-header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--card);
+    z-index: -1;
+  }
+
+  .header-titles { min-width: 0; }
+
+  .eyebrow {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  h1 {
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.3px;
+  }
+
+  .header-history-link {
+    display: none;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 8px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .header-history-link.active {
+    color: var(--accent);
+    background: var(--accent-bg);
+    border-color: var(--accent);
+  }
+
+  main {
+    flex: 1;
+    padding: 14px 16px 12px;
+    overflow-y: auto;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+
+  .card-pad { padding: 14px; }
+
+  .field-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .cat-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .cat-pill {
+    border-radius: 20px;
+    padding: 7px 12px;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+
+  .cat-pill.selected {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .income-toggle {
+    display: flex;
+    background: var(--paper);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 12px;
+  }
+
+  .income-toggle button {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .income-toggle button.active {
+    background: var(--ink);
+    color: white;
+  }
+
+  .input-row {
+    border-bottom: 0.5px solid var(--line);
+    padding: 11px 14px;
+  }
+
+  .input-row:last-child { border-bottom: none; }
+
+  .input-row input, .input-row select {
+    width: 100%;
+    border: none;
+    background: none;
+    font-size: 14px;
+    color: var(--ink);
+    outline: none;
+    font-family: inherit;
+    padding: 0;
+  }
+
+  .input-row input::placeholder { color: #ddd; }
+
+  .amount-input {
+    font-size: 24px !important;
+    font-weight: 300;
+    letter-spacing: -0.5px;
+  }
+
+  .yen-prefix {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .yen-prefix span {
+    font-size: 16px;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  button.submit {
+    width: 100%;
+    padding: 15px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-top: 4px;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+  }
+
+  button.submit:active { transform: scale(0.98); opacity: 0.85; }
+  button.submit:disabled { background: #ddd; }
+
+  button.secondary {
+    width: 100%;
+    padding: 13px;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  }
+
+  button.danger-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: none;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  /* Summary view */
+  .summary-hero {
+    padding: 18px;
+  }
+
+  .summary-amount {
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: -1px;
+    margin: 4px 0 2px;
+  }
+
+  .summary-sub {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .bar-bg {
+    background: var(--line);
+    border-radius: 4px;
+    height: 5px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 5px;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+  }
+
+  .cat-row {
+    padding: 11px 14px;
+    border-bottom: 0.5px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .cat-row:last-child { border-bottom: none; }
+
+  .cat-row-name {
+    font-size: 12px;
+    color: var(--ink);
+    margin-bottom: 5px;
+  }
+
+  .cat-row-bar { width: 110px; }
+
+  .cat-row-amount {
+    font-size: 12px;
+    color: var(--ink);
+    text-align: right;
+    margin-bottom: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tag {
+    display: inline-block;
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  .tag.over { background: var(--danger-bg); color: var(--danger); }
+  .tag.warn { background: var(--accent-bg); color: var(--accent); }
+  .tag.ok { color: var(--muted); }
+
+  .section-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1.2px;
+    margin: 4px 2px 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  /* 設定（予算上限）画面 */
+  .budget-row {
+    padding: 12px 14px;
+    border-bottom: 0.5px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .budget-row:last-child { border-bottom: none; }
+
+  .budget-row-name {
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .budget-row-input {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .budget-row-input span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .budget-row-input input {
+    width: 100px;
+    text-align: right;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    background: none;
+    font-size: 14px;
+    color: var(--ink);
+    outline: none;
+    font-family: inherit;
+    padding: 4px 2px;
+  }
+
+  .budget-row-input input:focus {
+    border-bottom-color: var(--accent);
+  }
+
+  /* Bottom nav */
+  nav.bottom-nav {
+    display: flex;
+    border-top: 0.5px solid var(--line);
+    padding: 6px 10px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+    gap: 4px;
+    position: sticky;
+    bottom: 0;
+  }
+
+  nav.bottom-nav::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--card);
+    z-index: -1;
+  }
+
+  .nav-item {
+    flex: 1;
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--muted);
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.15s ease, color 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .nav-item.active {
+    color: var(--accent);
+    background: var(--accent-bg);
+    font-weight: 700;
+  }
+
+  .nav-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .nav-icon svg { width: 100%; height: 100%; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ===== レスポンシブ対応（タブレット・PC） ===== */
+  @media (min-width: 768px) {
+    body {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+
+    #app {
+      position: static;
+      inset: auto;
+      max-width: min(1080px, 100%);
+      width: 100%;
+      height: auto;
+      min-height: 0;
+      margin: 0 auto;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    #app::before {
+      border-radius: 20px;
+    }
+
+    .status-spacer { display: none; }
+
+    header.app-header {
+      padding: 24px 32px;
+      border-radius: 20px 20px 0 0;
+    }
+
+    h1 { font-size: 24px; }
+
+    .header-history-link { display: inline-block; }
+
+    main {
+      overflow-y: visible;
+      padding: 24px 32px 32px;
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* PCでは入力とサマリーを同時表示（履歴表示中を除く） */
+    #view-input, #view-summary {
+      display: block !important;
+    }
+
+    #view-summary {
+      border-left: 0.5px solid var(--line);
+      padding-left: 24px;
+    }
+
+    #view-settings {
+      display: none;
+    }
+
+    /* 設定表示中は入力・サマリーを隠し、設定を全幅表示 */
+    body.showing-settings #view-input,
+    body.showing-settings #view-summary {
+      display: none !important;
+    }
+
+    body.showing-settings #view-settings {
+      display: block !important;
+      grid-column: 1 / -1;
+      border-left: none;
+      padding-left: 0;
+    }
+
+    nav.bottom-nav { display: none; }
+
+    .cat-pill:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      cursor: pointer;
+    }
+
+    button.submit:hover { opacity: 0.9; }
+
+    .toast { bottom: 32px; }
+  }
+
+  @media (min-width: 1024px) {
+    main {
+      grid-template-columns: minmax(360px, 460px) 1fr;
+      gap: 40px;
+    }
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    color: white;
+    padding: 11px 20px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    background: var(--ink);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* パスワード画面は撤去済み */
+
+  .skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #f7f7f7 37%, #f0f0f0 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+    border-radius: 6px;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="status-spacer"></div>
+
+  <header class="app-header">
+    <div class="header-titles">
+      <div class="eyebrow" id="header-period">読み込み中</div>
+      <h1 id="header-title">収支入力</h1>
+    </div>
+    <div class="header-history-link" id="header-settings-link" onclick="toggleDesktopView('settings')">設定</div>
+  </header>
+
+  <main>
+    <!-- 入力ビュー -->
+    <div id="view-input" class="view active">
+
+      <div class="card card-pad">
+        <div class="income-toggle">
+          <button id="btn-expense" class="active" onclick="setMode('expense')">支出</button>
+          <button id="btn-income" onclick="setMode('income')">収入</button>
+        </div>
+        <div class="field-label">カテゴリ</div>
+        <div class="cat-grid" id="cat-grid">
+          <div class="skeleton" style="width:70px;height:28px;"></div>
+          <div class="skeleton" style="width:50px;height:28px;"></div>
+          <div class="skeleton" style="width:60px;height:28px;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="input-row">
+          <div class="field-label" style="margin-bottom:6px;">金額</div>
+          <div class="yen-prefix">
+            <span>¥</span>
+            <input type="number" inputmode="numeric" id="input-amount" class="amount-input" placeholder="0">
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="field-label" style="margin-bottom:6px;">内容（メモ）</div>
+          <input type="text" id="input-memo" placeholder="例：スーパー">
+        </div>
+        <div class="input-row">
+          <div class="field-label" style="margin-bottom:6px;">日付</div>
+          <input type="date" id="input-date">
+        </div>
+        <div class="input-row">
+          <div class="field-label" style="margin-bottom:6px;">備考（任意）</div>
+          <input type="text" id="input-note" placeholder="例：クレジット">
+        </div>
+      </div>
+
+      <button class="submit" id="btn-submit" onclick="submitEntry()">登録する</button>
+    </div>
+
+    <!-- サマリービュー -->
+    <div id="view-summary" class="view">
+      <div id="summary-content">
+        <div class="card card-pad">
+          <div class="skeleton" style="width:80px;height:10px;margin-bottom:10px;"></div>
+          <div class="skeleton" style="width:140px;height:28px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設定ビュー（カテゴリ別予算上限） -->
+    <div id="view-settings" class="view">
+      <div class="section-label">カテゴリ別 予算上限</div>
+      <div id="settings-content">
+        <div class="card card-pad">
+          <div class="skeleton" style="width:100%;height:44px;margin-bottom:8px;"></div>
+          <div class="skeleton" style="width:100%;height:44px;"></div>
+        </div>
+      </div>
+      <button class="submit" id="btn-settings-save" onclick="saveSettings()">保存する</button>
+    </div>
+  </main>
+
+  <nav class="bottom-nav">
+    <div class="nav-item active" id="nav-input" onclick="switchView('input')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </div>
+      入力
+    </div>
+    <div class="nav-item" id="nav-summary" onclick="switchView('summary')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 16l4-6 3 3 5-7"/></svg>
+      </div>
+      サマリー
+    </div>
+    <div class="nav-item" id="nav-settings" onclick="switchView('settings')">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      設定
+    </div>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ===== ここにGASのウェブアプリURLを設定 =====
+const API_URL = "https://script.google.com/macros/s/AKfycbxkFeQRALKJTyJ5K0o-mVhl-R2a1Zo5-Nt3cEh-M-dIuvMpoozwBZtd2knP7bqS-rPtMQ/exec";
+
+const 収入カテゴリ = ["給与", "その他収入"];
+let mode = "expense";
+let selectedCategory = null;
+let categories = [];
+let summaryData = null;
+
+// 初期化
+// valueAsDateはUTC基準で日付を扱うため、日本時間の朝9時より前に開くと
+// 前日の日付になってしまう。ローカルの年月日から直接文字列を組み立てて設定する。
+function todayLocalDateString() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+document.getElementById('input-date').value = todayLocalDateString();
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-expense').classList.toggle('active', m === 'expense');
+  document.getElementById('btn-income').classList.toggle('active', m === 'income');
+  selectedCategory = null;
+  renderCategories();
+}
+
+const VIEW_TITLES = { input: '収支入力', summary: 'サマリー', settings: '設定' };
+
+function switchView(v) {
+  ['input', 'summary', 'settings'].forEach(name => {
+    document.getElementById('view-' + name).classList.toggle('active', v === name);
+    document.getElementById('nav-' + name).classList.toggle('active', v === name);
+  });
+  document.getElementById('header-title').textContent = VIEW_TITLES[v] || '家計簿';
+
+  if (v === 'summary') loadSummary();
+  if (v === 'settings') loadSettings();
+
+  // デスクトップ用のヘッダーリンクとの状態同期
+  document.getElementById('header-settings-link').classList.toggle('active', v === 'settings');
+  document.body.classList.toggle('showing-settings', v === 'settings');
+}
+
+// デスクトップ（768px以上）ではボトムナビが無いため、ヘッダーのリンクで履歴/設定表示を切り替える
+function toggleDesktopView(v) {
+  const isShowing = document.body.classList.contains('showing-' + v);
+  if (isShowing) {
+    switchView('input');
+  } else {
+    switchView(v);
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function renderCategories() {
+  const grid = document.getElementById('cat-grid');
+  const filtered = categories.filter(c => 
+    mode === 'income' ? 収入カテゴリ.includes(c) : !収入カテゴリ.includes(c)
+  );
+  grid.innerHTML = filtered.map(cat => 
+    `<div class="cat-pill ${selectedCategory === cat ? 'selected' : ''}" onclick="selectCategory('${cat.replace(/'/g, "\\'")}')">${cat}</div>`
+  ).join('');
+}
+
+function selectCategory(cat) {
+  selectedCategory = cat;
+  renderCategories();
+}
+
+async function loadCategories() {
+  try {
+    const res = await fetch(`${API_URL}?action=getCategories`);
+    const data = await res.json();
+    categories = data.categories || [];
+    renderCategories();
+    loadHeaderPeriod();
+  } catch (e) {
+    document.getElementById('cat-grid').innerHTML = '<div class="empty-state">読み込みに失敗しました</div>';
+  }
+}
+
+async function loadHeaderPeriod() {
+  try {
+    const res = await fetch(`${API_URL}?action=getSummary`);
+    const data = await res.json();
+    document.getElementById('header-period').textContent = `${data.year}年 ${data.month}月`;
+  } catch (e) {}
+}
+
+async function submitEntry() {
+  if (!selectedCategory) { showToast('カテゴリを選んでください'); return; }
+  const amount = parseInt(document.getElementById('input-amount').value);
+  if (!amount || amount <= 0) { showToast('金額を入力してください'); return; }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = '登録中...';
+
+  const payload = {
+    category: selectedCategory,
+    memo: document.getElementById('input-memo').value,
+    date: document.getElementById('input-date').value,
+    note: document.getElementById('input-note').value,
+    income: mode === 'income' ? amount : 0,
+    expense: mode === 'expense' ? amount : 0,
+  };
+
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload),
+    });
+    showToast('登録しました');
+    document.getElementById('input-amount').value = '';
+    document.getElementById('input-memo').value = '';
+    document.getElementById('input-note').value = '';
+    selectedCategory = null;
+    renderCategories();
+  } catch (e) {
+    showToast('登録に失敗しました');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '登録する';
+  }
+}
+
+async function loadSummary() {
+  const container = document.getElementById('summary-content');
+  try {
+    const res = await fetch(`${API_URL}?action=getSummary`);
+    const data = await res.json();
+    summaryData = data;
+    document.getElementById('header-period').textContent = `${data.year}年 ${data.month}月`;
+
+    const income = parseFloat(data.income) || 0;
+    const expense = parseFloat(data.expense) || 0;
+    const balance = parseFloat(data.balance) || 0;
+    const usedPercent = income > 0 ? Math.min(Math.round(expense / income * 100), 100) : 0;
+
+    let catHTML = '';
+    if (data.categories && data.categories.length > 0) {
+      catHTML = data.categories.map(c => {
+        let tagHTML = `<span class="tag ok">${c.percent}%</span>`;
+        let barColor = '#ddd';
+        if (c.percent >= 100) { tagHTML = `<span class="tag over">超過</span>`; barColor = 'var(--danger)'; }
+        else if (c.percent >= 80) { tagHTML = `<span class="tag warn">${c.percent}%</span>`; barColor = 'var(--accent)'; }
+        const barWidth = Math.min(c.percent, 100);
+        return `
+          <div class="cat-row">
+            <div style="flex:1;">
+              <div class="cat-row-name">${c.name}</div>
+              <div class="bar-bg cat-row-bar">
+                <div class="bar-fill" style="width:${barWidth}%; background:${barColor};"></div>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="cat-row-amount">¥${c.amount.toLocaleString()}</div>
+              ${tagHTML}
+            </div>
+          </div>`;
+      }).join('');
+    } else {
+      catHTML = '<div class="empty-state">カテゴリデータがありません</div>';
+    }
+
+    container.innerHTML = `
+      <div class="card card-pad summary-hero">
+        <div class="field-label">今月の支出</div>
+        <div class="summary-amount">¥${expense.toLocaleString()}</div>
+        <div class="summary-sub">収入 ¥${income.toLocaleString()} の ${usedPercent}%</div>
+        <div class="bar-bg">
+          <div class="bar-fill" style="width:${usedPercent}%; background:var(--accent);"></div>
+        </div>
+      </div>
+      <div class="card card-pad" style="display:flex; justify-content:space-between;">
+        <div>
+          <div class="field-label">残高</div>
+          <div style="font-size:16px; font-weight:600; color:${balance >= 0 ? 'var(--ink)' : 'var(--danger)'};">¥${balance.toLocaleString()}</div>
+        </div>
+      </div>
+      <div class="section-label">カテゴリ別</div>
+      <div class="card">${catHTML}</div>
+    `;
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state">読み込みに失敗しました<br>もう一度お試しください</div>';
+  }
+}
+
+// ===== 設定（カテゴリ別 予算上限） =====
+// GAS側に action=getBudgets を実装する必要があります。
+// 期待するレスポンス形式: { budgets: { "食費（外食）": 20000, "趣味": 10000, ... } }
+// 未設定のカテゴリは0または未定義で構いません。
+let currentBudgets = {};
+
+async function loadSettings() {
+  const container = document.getElementById('settings-content');
+  try {
+    const res = await fetch(`${API_URL}?action=getBudgets`);
+    const data = await res.json();
+    currentBudgets = data.budgets || {};
+
+    if (categories.length === 0) {
+      container.innerHTML = '<div class="empty-state">カテゴリがありません</div>';
+      return;
+    }
+
+    const rows = categories.map((cat, i) => {
+      const limit = currentBudgets[cat] || '';
+      return `
+        <div class="budget-row">
+          <div class="budget-row-name">${cat}</div>
+          <div class="budget-row-input">
+            <span>¥</span>
+            <input type="number" inputmode="numeric" class="budget-input" id="budget-input-${i}" data-category="${cat.replace(/"/g, '&quot;')}" placeholder="上限なし" value="${limit}">
+          </div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `<div class="card">${rows}</div>`;
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state">読み込みに失敗しました<br>もう一度お試しください</div>';
+  }
+}
+
+// GAS側に action=updateBudgets を実装する必要があります。
+// リクエスト例: { pw, action: "updateBudgets", budgets: { "食費（外食）": 20000, "趣味": 10000 } }
+async function saveSettings() {
+  const btn = document.getElementById('btn-settings-save');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  const budgets = {};
+  document.querySelectorAll('#settings-content .budget-input').forEach(el => {
+    const cat = el.dataset.category;
+    const val = parseInt(el.value);
+    budgets[cat] = val > 0 ? val : 0;
+  });
+
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'updateBudgets', budgets: budgets }),
+    });
+    showToast('保存しました');
+    currentBudgets = budgets;
+  } catch (e) {
+    showToast('保存に失敗しました');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存する';
+  }
+}
+
+loadCategories();
+if (window.matchMedia('(min-width: 768px)').matches) loadSummary();
+
+// Service Worker登録（オフライン対応・ホーム画面アイコン用）
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+
+</body>
+</html>
